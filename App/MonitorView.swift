@@ -3,6 +3,7 @@ import UIKit
 
 struct MonitorView: View {
     @EnvironmentObject private var camera: CameraManager
+    @EnvironmentObject private var wifi: WiFiManager
 
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("flip180") private var flip180 = false
@@ -17,21 +18,32 @@ struct MonitorView: View {
     @State private var pan: CGSize = .zero
     @State private var panAtGestureStart: CGSize = .zero
 
+    private var isLive: Bool { wifi.phase == .live || camera.phase == .live }
+    private var currentFrame: UIImage? { wifi.isActive ? wifi.frame : camera.frame }
+    private var liveName: String {
+        wifi.isActive ? "Wi-Fi" : (camera.cameraName ?? "USB")
+    }
+    private var liveFPS: Double { wifi.isActive ? wifi.fps : camera.fps }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                if let frame = camera.frame {
+                if let frame = currentFrame {
                     liveImage(frame, in: geo.size)
                 }
 
-                if camera.phase != .live {
-                    statusCard
-                        .padding(24)
+                if !isLive {
+                    ScrollView {
+                        statusCard
+                            .padding(24)
+                            .frame(maxWidth: .infinity, minHeight: geo.size.height)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
                 }
 
-                if hudVisible || camera.phase != .live {
+                if hudVisible || !isLive {
                     hud
                         .transition(.opacity)
                 }
@@ -43,6 +55,9 @@ struct MonitorView: View {
         }
         .ignoresSafeArea()
         .sheet(isPresented: $showLog) { LogView().environmentObject(camera) }
+        .onChange(of: wifi.phase) { _, newPhase in
+            if newPhase == .live { resetZoom(); scheduleHUDHide() }
+        }
         .onAppear { scheduleHUDHide() }
     }
 
@@ -83,12 +98,12 @@ struct MonitorView: View {
             HStack(alignment: .top, spacing: 12) {
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(camera.phase == .live ? Color.red : Color.gray)
+                        .fill(isLive ? Color.red : Color.gray)
                         .frame(width: 10, height: 10)
-                    Text(camera.phase == .live ? (camera.cameraName ?? "Live") : "Not live")
+                    Text(isLive ? liveName : "Not live")
                         .font(.system(.footnote, design: .rounded).weight(.semibold))
-                    if camera.phase == .live {
-                        Text(String(format: "%.0f fps", camera.fps))
+                    if isLive {
+                        Text(String(format: "%.0f fps", liveFPS))
                             .font(.system(.footnote, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
@@ -111,6 +126,9 @@ struct MonitorView: View {
                         hudButton("1.magnifyingglass", "Reset zoom") { resetZoom() }
                     }
                     hudButton("list.bullet.rectangle", "Log") { showLog = true }
+                    if wifi.isActive {
+                        hudButton("xmark", "Disconnect") { wifi.stop() }
+                    }
                 }
             }
             Spacer()
@@ -135,18 +153,105 @@ struct MonitorView: View {
 
     // MARK: - Status card
 
+    @ViewBuilder
     private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        if wifi.isActive {
+            card { wifiCard }
+        } else {
+            card { usbCard }
+        }
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) { content() }
+            .frame(maxWidth: 560, alignment: .leading)
+            .padding(22)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .foregroundStyle(.white)
+    }
+
+    @ViewBuilder
+    private var wifiCard: some View {
+        switch wifi.phase {
+        case .idle, .live:
+            EmptyView()
+
+        case .bluetooth, .connecting:
+            HStack(spacing: 10) {
+                ProgressView().tint(.white)
+                Text("Wi-Fi").font(.title3.weight(.bold))
+            }
+            Text(wifi.status).font(.callout).foregroundStyle(.secondary)
+            Button("Cancel") { wifi.stop() }.buttonStyle(.bordered)
+
+        case .joinWiFi(let creds):
+            Text("Join the camera's Wi-Fi").font(.title3.weight(.bold))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("1. Open **Settings › Wi-Fi › Other…** (the camera's network is hidden).")
+                HStack(spacing: 6) {
+                    Text("2. Name:")
+                    Text(creds.ssid).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                    Button { UIPasteboard.general.string = creds.ssid } label: { Image(systemName: "doc.on.doc") }
+                }
+                Text("3. Security: **WPA2/WPA3 Personal**")
+                HStack(spacing: 6) {
+                    Text("4. Password (already copied — just paste):")
+                    Text(creds.password).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                    Button { UIPasteboard.general.string = creds.password } label: { Image(systemName: "doc.on.doc") }
+                }
+                Text("5. Come back here — it connects by itself.")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            HStack {
+                Button("Open Settings") { openWiFiSettings() }.buttonStyle(.borderedProminent)
+                Button("Connect now") { wifi.connectNow() }.buttonStyle(.bordered)
+                Button("Cancel") { wifi.stop() }.buttonStyle(.bordered)
+            }
+
+        case .failed(let message):
+            Text("Wi-Fi didn't connect").font(.title3.weight(.bold))
+            Text(message).font(.callout).foregroundStyle(.secondary)
+            HStack {
+                Button("Start over") { wifi.start() }.buttonStyle(.borderedProminent)
+                Button("Connect now") { wifi.connectNow() }.buttonStyle(.bordered)
+                Button("Log") { showLog = true }.buttonStyle(.bordered)
+                Button("Cancel") { wifi.stop() }.buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func openWiFiSettings() {
+        // The Wi-Fi page itself if iOS allows it, otherwise the Settings app.
+        let wifiURL = URL(string: "App-Prefs:root=WIFI")!
+        UIApplication.shared.open(wifiURL) { ok in
+            if !ok, let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var usbCard: some View {
             switch camera.phase {
             case .waitingForCamera:
                 Text("Connect your camera").font(.title3.weight(.bold))
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("1. On the camera: MENU › NETWORK/USB SETTING › USB › **USB TETHER SHOOTING AUTO**")
-                    Text("2. Plug it into the iPhone with a USB-C cable that carries data.")
-                    Text("3. Allow access if iOS asks.")
+                    Text("**Wi-Fi** — X-T50, X-S20, X-T5, X100VI and other recent bodies")
+                    Text("Camera on, Bluetooth on. Swipe Fujifilm's app closed first so it doesn't hold the camera.")
+                        .foregroundStyle(.secondary)
                 }
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                HStack {
+                    Button("Connect over Wi-Fi") { wifi.start() }.buttonStyle(.borderedProminent)
+                    Button("Already on the camera's Wi-Fi") { wifi.connectNow() }.buttonStyle(.bordered)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("**USB** — bodies with a tether mode (X-T5, X-H2…)")
+                    Text("MENU › NETWORK/USB SETTING › CONNECTION MODE › USB TETHER SHOOTING AUTO, then plug in.")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.callout)
 
             case .connecting:
                 HStack(spacing: 10) {
@@ -180,11 +285,6 @@ struct MonitorView: View {
             case .live:
                 EmptyView()
             }
-        }
-        .frame(maxWidth: 520, alignment: .leading)
-        .padding(22)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .foregroundStyle(.white)
     }
 
     // MARK: - Gestures
@@ -262,6 +362,7 @@ struct GridOverlay: View {
 
 struct LogView: View {
     @EnvironmentObject private var camera: CameraManager
+    @EnvironmentObject private var wifi: WiFiManager
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

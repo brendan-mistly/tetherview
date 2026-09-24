@@ -1,0 +1,47 @@
+# XcodeGen spec. Generate the Xcode project with:  xcodegen generate
+name: Tetherview
+options:
+  bundleIdPrefix: io.github.tetherview
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Tetherview:
+    type: application
+    platform: iOS
+    # Shared scheme, so `xcodebuild -scheme Tetherview` works on a clean CI checkout.
+    scheme: {}
+    sources:
+      - path: App
+      - path: Sources/TetherviewCore
+    info:
+      path: Support/Info.plist
+      properties:
+        CFBundleDisplayName: Tetherview
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationLandscapeLeft
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationLandscapeLeft
+        NSCameraUsageDescription: Tetherview shows the live view from a camera connected to the USB-C port.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.tetherview.app
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""

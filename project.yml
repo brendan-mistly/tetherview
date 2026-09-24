@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 targets:
@@ -39,6 +39,10 @@ targets:
           - UIInterfaceOrientationLandscapeRight
           - UIInterfaceOrientationLandscapeLeft
         NSCameraUsageDescription: Tetherview shows the live view from a camera connected to the USB-C port.
+        NSBluetoothAlwaysUsageDescription: Tetherview uses Bluetooth to ask your camera to turn on its Wi-Fi for live view.
+        NSLocalNetworkUsageDescription: Tetherview connects to your camera's Wi-Fi to show its live view.
+        UIBackgroundModes:
+          - bluetooth-central
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.tetherview.app

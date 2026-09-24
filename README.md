@@ -1,10 +1,29 @@
 # Tetherview
 
-**Use your iPhone as a full-screen, landscape monitor for a Fujifilm X camera, with just a USB-C cable.**
+**Use your iPhone as a full-screen, landscape monitor for a Fujifilm X camera, over Wi-Fi or USB-C.**
 There's no Fujifilm app, no capture card, no computer and nothing to buy.
 
-> Status: **experimental (v0.1).** The protocol logic is unit-tested against a simulated camera. It has **not yet been confirmed on a real X-T50.**
+> Status: **experimental (v0.2).** Both protocols are unit-tested against simulated cameras.
+> - **USB** is confirmed to connect to a real X-T50. That body has no USB live view, though, so X-T50 owners use Wi-Fi.
+> - **Wi-Fi** (added in v0.2) has not been confirmed on a real camera yet.
+>
 > If you try it, please open an issue and include the in-app connection log (Log › Copy).
+
+## Two ways to connect
+
+| | Wi-Fi (v0.2) | USB |
+|---|---|---|
+| Cameras | Recent bodies paired through Bluetooth: X-T50, X-S20, X-T5, X100VI… | Bodies with a **USB TETHER SHOOTING** mode (X-T5, X-H2…) |
+| How | The app pairs over Bluetooth and asks the camera to start its Wi-Fi. You join that network once in Settings, and live view streams on 192.168.0.1:55742. | PTP over the USB-C cable. |
+| Camera controls | Locked while remote live view runs, as with Fujifilm's own app. | Work unless the camera insists on PC control. |
+
+**Wi-Fi steps:**
+1. Swipe Fujifilm's app closed so it doesn't hold the camera.
+2. With the camera on, tap **Connect over Wi-Fi** and accept the Bluetooth pairing prompt.
+3. The app copies the camera's Wi-Fi password to the clipboard. Join the hidden network in **Settings › Wi-Fi › Other…** using the name the app shows and **WPA2/WPA3 Personal** security.
+4. Come back to the app and it connects on its own.
+
+If Fujifilm's app has already put the iPhone on the camera's Wi-Fi, tap **Already on the camera's Wi-Fi** instead.
 
 ## Why this exists
 
@@ -20,7 +39,7 @@ There's no Fujifilm app, no capture card, no computer and nothing to buy.
 - Keeps the screen awake while it's open.
 - A connection log you can copy and paste into bug reports.
 
-## Camera setup (X-T50 and other recent X bodies)
+## USB camera setup (bodies with a tether mode)
 
 1. **MENU › NETWORK/USB SETTING › USB SETTING › USB TETHER SHOOTING AUTO.** On some bodies the menu path is *CONNECTION SETTING › PC CONNECTION MODE*.
 2. Plug the camera into the iPhone with a USB-C cable **that carries data**, such as the one that came with the camera.
@@ -81,10 +100,10 @@ Other good first issues:
 - A frame-rate / quality setting (live-view size prop `0xD174`)
 - Focus peaking and zebras, computed on-device from the JPEG
 - Live histogram (Fujifilm exposes it as the `0xD22F` blob property)
-- Wi-Fi mode (needs the Bluetooth pairing handshake worked out)
 
 ## Credits
 
+- Fujifilm Bluetooth handover, Wi-Fi PTP/IP and live-view sequence: [libfuji](https://github.com/petabyt/libfuji) by Daniel Cook (MIT), which builds on [furble](https://github.com/gkoh/furble).
 - Fujifilm USB live-view sequence and property codes: documented by [mikefsq/ptp](https://github.com/mikefsq/ptp) (MIT), tested on an X-T5.
 - Fujifilm PTP research: [fudge / camlib](https://codeberg.org/p/fudge) by Daniel C., and [fuji-cam-wifi-tool](https://github.com/hkr/fuji-cam-wifi-tool).
 - iOS ImageCaptureCore field notes: [che / nikon_ptp_flutter](https://github.com/Rabbit95/che).
